@@ -1,0 +1,206 @@
+<html>
+<head>
+    <title>Password Strength Checker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.7);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .strength-meter div {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .password-input-container {
+            position: relative;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+        .suggested-password-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .suggested-password-container span {
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-3xl font-bold mb-6">Password Strength Checker</h2>
+        <div class="password-input-container mb-6">
+            <input type="password" id="password" class="password-input w-full p-3 border border-gray-300 rounded" placeholder="Enter your password">
+            <i id="toggle-password" class="fas fa-eye toggle-password"></i>
+        </div>
+        <div class="strength-meter h-2 w-full bg-gray-300 rounded mb-6">
+            <div id="strength-bar" class="h-full bg-red-500 rounded"></div>
+        </div>
+        <div id="strength-feedback" class="text-sm text-gray-600 mb-6">Enter a password to see its strength</div>
+        <button id="suggest-password" class="bg-blue-500 text-white py-2 px-4 rounded mb-6 w-full">Suggest Strong Password</button>
+        <div id="suggested-password" class="text-sm text-gray-600 mb-6 hidden suggested-password-container">
+            <span id="password-text"></span>
+            <button id="copy-password" class="bg-green-500 text-white py-1 px-2 rounded">Copy</button>
+        </div>
+    </div>
+
+    <script>
+        const passwordInput = document.getElementById('password');
+        const strengthMeter = document.querySelector('.strength-meter');
+        const strengthBar = document.getElementById('strength-bar');
+        const strengthFeedback = document.getElementById('strength-feedback');
+        const suggestPasswordBtn = document.getElementById('suggest-password');
+        const suggestedPasswordDiv = document.getElementById('suggested-password');
+        const passwordText = document.getElementById('password-text');
+        const copyPasswordBtn = document.getElementById('copy-password');
+        const togglePassword = document.getElementById('toggle-password');
+
+        passwordInput.addEventListener('input', updateStrengthMeter);
+        suggestPasswordBtn.addEventListener('click', suggestPassword);
+        copyPasswordBtn.addEventListener('click', copyPassword);
+        togglePassword.addEventListener('click', togglePasswordVisibility);
+
+        function updateStrengthMeter() {
+            const weaknesses = calculatePasswordStrength(passwordInput.value);
+            let strength = 100;
+            strengthBar.style.width = strength + '%';
+            strengthFeedback.textContent = 'Strong';
+            strengthFeedback.className = 'text-sm text-green-600 mb-6';
+
+            weaknesses.forEach(weakness => {
+                if (weakness == null) return;
+                strength -= weakness.deduction;
+                strengthBar.style.width = strength + '%';
+                if (strength <= 50) {
+                    strengthFeedback.textContent = 'Weak';
+                    strengthFeedback.className = 'text-sm text-red-600 mb-6';
+                    strengthBar.className = 'h-full bg-red-500 rounded';
+                } else if (strength <= 80) {
+                    strengthFeedback.textContent = 'Medium';
+                    strengthFeedback.className = 'text-sm text-yellow-600 mb-6';
+                    strengthBar.className = 'h-full bg-yellow-500 rounded';
+                } else {
+                    strengthFeedback.textContent = 'Strong';
+                    strengthFeedback.className = 'text-sm text-green-600 mb-6';
+                    strengthBar.className = 'h-full bg-green-500 rounded';
+                }
+            });
+        }
+
+        function calculatePasswordStrength(password) {
+            const weaknesses = [];
+            weaknesses.push(lengthWeakness(password));
+            weaknesses.push(lowercaseWeakness(password));
+            weaknesses.push(uppercaseWeakness(password));
+            weaknesses.push(numberWeakness(password));
+            weaknesses.push(specialCharactersWeakness(password));
+            return weaknesses;
+        }
+
+        function lengthWeakness(password) {
+            const length = password.length;
+            if (length <= 5) {
+                return {
+                    message: 'Your password is too short',
+                    deduction: 40
+                };
+            }
+            if (length <= 10) {
+                return {
+                    message: 'Your password could be longer',
+                    deduction: 15
+                };
+            }
+        }
+
+        function lowercaseWeakness(password) {
+            return characterTypeWeakness(password, /[a-z]/g, 'lowercase characters');
+        }
+
+        function uppercaseWeakness(password) {
+            return characterTypeWeakness(password, /[A-Z]/g, 'uppercase characters');
+        }
+
+        function numberWeakness(password) {
+            return characterTypeWeakness(password, /[0-9]/g, 'numbers');
+        }
+
+        function specialCharactersWeakness(password) {
+            return characterTypeWeakness(password, /[^0-9a-zA-Z\s]/g, 'special characters');
+        }
+
+        function characterTypeWeakness(password, regex, type) {
+            const matches = password.match(regex) || [];
+            if (matches.length === 0) {
+                return {
+                    message: `Your password has no ${type}`,
+                    deduction: 20
+                };
+            }
+            if (matches.length <= 2) {
+                return {
+                    message: `Your password could use more ${type}`,
+                    deduction: 5
+                };
+            }
+        }
+
+        function suggestPassword() {
+            const suggestedPassword = generateStrongPassword();
+            passwordText.textContent = suggestedPassword;
+            suggestedPasswordDiv.classList.remove('hidden');
+        }
+
+        function generateStrongPassword() {
+            const length = 12;
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+            let password = "";
+            for (let i = 0, n = charset.length; i < length; ++i) {
+                password += charset.charAt(Math.floor(Math.random() * n));
+            }
+            return password;
+        }
+
+        function copyPassword() {
+            const textarea = document.createElement('textarea');
+            textarea.value = passwordText.textContent;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('Password copied to clipboard');
+        }
+
+        function togglePasswordVisibility() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            togglePassword.classList.toggle('fa-eye-slash');
+        }
+    </script>
+</body>
+</html>
